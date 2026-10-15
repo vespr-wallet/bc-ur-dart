@@ -3,18 +3,9 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'bytewords.dart';
 
-// In FountainEncoderPart
-// int get checksum => Bytewords.crc32(data); // Already done? No it was commented out in my thought.
-// Wait, line 180 is final int checksum. It's passed in constructor.
-// Ah, I need to check where checksum comes from.
-// In `FountainEncoder.nextPart`: `final checksum = checksum;` (class field).
-// In `FountainEncoder` factory: `final checksum = Bytewords.crc32(message);`
-
-// Line 268: final checksum = _crc32(message); -> Bytewords.crc32(message)
-
-// Line 511: final checksum = FountainEncoder._crc32(message); -> Bytewords.crc32(message)
-
-// Remove _crc32 method (lines 367-381)
+// JavaScript note: this file must stay free of 64-bit integer reads, writes and shifts. On dart2js and DDC
+// `ByteData.getUint64`/`setUint64` throw, and bitwise operators truncate to 32 bits. 64-bit values are
+// handled as BigInt (the PRNG state) or as two 32-bit halves (CBOR integers).
 
 /// XOR utilities for fountain codes
 class Xor {
@@ -62,10 +53,11 @@ class Xoshiro256 {
   void _setS(Uint8List bytes) {
     final view = ByteData.sublistView(bytes);
     for (int i = 0; i < 4; i++) {
-      // Read 64-bit integer, assuming Big Endian layout from the SHA256 digest
-      // which matches the C++ loop `v <<= 8; v |= a[o+n];`
-      final longVal = view.getUint64(i * 8, Endian.big);
-      _s[i] = BigInt.from(longVal).toUnsigned(64);
+      // Big endian 64-bit words of the SHA256 digest, matching the C++ loop `v <<= 8; v |= a[o+n];`.
+      // Read as two 32-bit halves: ByteData.getUint64 is unsupported on JavaScript.
+      final high = view.getUint32(i * 8, Endian.big);
+      final low = view.getUint32(i * 8 + 4, Endian.big);
+      _s[i] = (BigInt.from(high) << 32) | BigInt.from(low);
     }
   }
 
@@ -176,13 +168,8 @@ class RandomSampler {
     _aliases = newAliases;
   }
 
-  /// Returns next sample. Requires two random doubles [0, 1).
-  /// C++ implementation accepts a function returning double.
-  /// To support both APIs, we can take a generator or just call it implicitly if we had the RNG.
-  /// Since we pass RNG to `chooseDegree`, we should change `next` signature or `chooseDegree` logic.
-  /// My `chooseDegree` passes `rng` to `next`.
-  /// Wait, previous `next` took `probability`.
-  /// New `next` needs access to RNG to call `nextDouble` TWICE.
+  /// Returns the next sample from two random doubles in [0, 1), drawn in this order from the RNG
+  /// (the C++ implementation draws them inside, from a passed-in generator).
   int next(double r1, double r2) {
     final n = _probs.length;
     final i = (n * r1).floor();
@@ -263,9 +250,11 @@ class FountainEncoderPart {
           cbor[offset + 4];
       return _IntResult(value, offset + 5);
     } else if (first == 27) {
-      // 64-bit int
+      // 64-bit int, read as two 32-bit halves: ByteData.getUint64 is unsupported on JavaScript
+      // (exact up to 2^53 there; the part fields are 32-bit in practice).
       final view = ByteData.sublistView(cbor, offset + 1, offset + 9);
-      final value = view.getUint64(0, Endian.big);
+      final value = view.getUint32(0, Endian.big) * 0x100000000 +
+          view.getUint32(4, Endian.big);
       return _IntResult(value, offset + 9);
     }
     throw const FormatException('Invalid CBOR int');
@@ -334,15 +323,17 @@ class FountainEncoderPart {
       buffer.addByte(value & 0xFF);
     } else {
       buffer.addByte(27);
-      // Dart int is 64 bit
-      buffer.addByte((value >> 56) & 0xFF);
-      buffer.addByte((value >> 48) & 0xFF);
-      buffer.addByte((value >> 40) & 0xFF);
-      buffer.addByte((value >> 32) & 0xFF);
-      buffer.addByte((value >> 24) & 0xFF);
-      buffer.addByte((value >> 16) & 0xFF);
-      buffer.addByte((value >> 8) & 0xFF);
-      buffer.addByte(value & 0xFF);
+      // Split into 32-bit halves first: shifts past 32 bits truncate on JavaScript.
+      final high = value ~/ 0x100000000;
+      final low = value - high * 0x100000000;
+      buffer.addByte((high >> 24) & 0xFF);
+      buffer.addByte((high >> 16) & 0xFF);
+      buffer.addByte((high >> 8) & 0xFF);
+      buffer.addByte(high & 0xFF);
+      buffer.addByte((low >> 24) & 0xFF);
+      buffer.addByte((low >> 16) & 0xFF);
+      buffer.addByte((low >> 8) & 0xFF);
+      buffer.addByte(low & 0xFF);
     }
   }
 
@@ -629,19 +620,6 @@ class FountainDecoder {
   }
 
   void _processMixedPart(_DecoderPart p) {
-    // Check for duplicate by key (indexes equality)
-    // Map keys are compared by default equality. Set equality is identity by default.
-    // Need custom check or rely on map? Set equality is tricky in Dart Maps.
-    // I will iterate to check equality manually or use a custom Key wrapper?
-    // Actually, `Set` in Dart doesn't implement value equality for `==`.
-    // I MUST handle this. `_simpleParts` and `_mixedParts` maps won't work correctly with Sets as keys if I rely on `==`.
-    // Instead of Map, I should use List and manual lookup?
-    // Or key as String representation of indexes? String is value-equal.
-    // I'll use `_indexesToString` as key for Maps.
-
-    // For now, let's implement validation logic inside methods without relying on Map index lookup optimizations if possible, or fix Map keys.
-    // Re-writing Map usage below.
-
     final key = _key(p.indexes);
     if (_mixedParts.containsKey(key)) {
       return; // Already have this exact mixed part
@@ -670,13 +648,11 @@ class FountainDecoder {
     _mixedParts[key] = currentPart;
   }
 
-  // NOTE: Dart Set equality is not value-based. I'll use String key for maps.
+  /// Map key for a set of fragment indexes (Dart sets have identity equality).
   String _key(Set<int> indexes) {
     final list = indexes.toList()..sort();
     return list.join(',');
   }
-
-  // Re-implementing parts of class to support keying
 
   double get progress => estimatedPercentComplete;
   Uint8List? getMessage() => message;

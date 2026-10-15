@@ -1,5 +1,8 @@
 # 💎 BC-UR Dart
 
+> VESPR fork of [bc_ur](https://pub.dev/packages/bc_ur) (upstream: GitLab `aa22396584/bc-ur-dart`) with fixes for
+> Dart compiled to JavaScript (dart2js/DDC). Used by git ref; see [CHANGELOG](CHANGELOG.md).
+
 ![BC-UR Dart Hero](hero.png)
 
 <div align="center">

@@ -19,6 +19,19 @@ void main() {
       expect(mapCbor[0], equals(0xA2)); // Map with 2 items
     });
 
+    test('CBOR 64-bit integers round-trip (JavaScript safe)', () {
+      // 2^40 + 0xA5A5A5A5: both halves populated, below 2^53 so exact on JavaScript too.
+      const value = 1099511627776 + 0xA5A5A5A5;
+      final encoded = CborEncoder.encode(value);
+      expect(
+        encoded,
+        equals(
+            Uint8List.fromList([0x1B, 0, 0, 0x01, 0, 0xA5, 0xA5, 0xA5, 0xA5])),
+      );
+      expect(CborDecoder.decode(encoded), equals(value));
+      expect(CborDecoder.decode(CborEncoder.encode(-value)), equals(-value));
+    });
+
     test('CBOR Decoding', () {
       final data = {'id': 123, 'name': 'John Doe'};
       final encoded = CborEncoder.encode(data);

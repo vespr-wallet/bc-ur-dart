@@ -57,14 +57,17 @@ class CborEncoder {
       buffer.addByte(value & 0xFF);
     } else {
       buffer.addByte(type | 27);
-      buffer.addByte(value >> 56);
-      buffer.addByte((value >> 48) & 0xFF);
-      buffer.addByte((value >> 40) & 0xFF);
-      buffer.addByte((value >> 32) & 0xFF);
-      buffer.addByte((value >> 24) & 0xFF);
-      buffer.addByte((value >> 16) & 0xFF);
-      buffer.addByte((value >> 8) & 0xFF);
-      buffer.addByte(value & 0xFF);
+      // Split into 32-bit halves first: shifts past 32 bits truncate on JavaScript.
+      final high = value ~/ 0x100000000;
+      final low = value - high * 0x100000000;
+      buffer.addByte((high >> 24) & 0xFF);
+      buffer.addByte((high >> 16) & 0xFF);
+      buffer.addByte((high >> 8) & 0xFF);
+      buffer.addByte(high & 0xFF);
+      buffer.addByte((low >> 24) & 0xFF);
+      buffer.addByte((low >> 16) & 0xFF);
+      buffer.addByte((low >> 8) & 0xFF);
+      buffer.addByte(low & 0xFF);
     }
   }
 
@@ -171,11 +174,10 @@ class CborDecoder {
       _offset += 4;
       return value;
     } else if (info == 27) {
-      int value = 0;
-      for (int i = 0; i < 8; i++) {
-        value = (value << 8) | _data[_offset++];
-      }
-      return value;
+      // Two 32-bit halves: shifting past 32 bits truncates on JavaScript (exact up to 2^53 there).
+      final high = _decodeUnsigned(26);
+      final low = _decodeUnsigned(26);
+      return high * 0x100000000 + low;
     } else {
       throw FormatException('Invalid additional info: $info');
     }
