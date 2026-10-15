@@ -1,0 +1,16 @@
+name: bc_ur
+description: A complete BC-UR (Blockchain Commons Uniform Resources) implementation in Dart. Supports UR encoding/decoding, CBOR, and Fountain Codes for animated QR codes.
+version: 1.0.1
+homepage: https://gitlab.com/aa22396584/bc-ur-dart
+repository: https://gitlab.com/aa22396584/bc-ur-dart
+issue_tracker: https://gitlab.com/aa22396584/bc-ur-dart/-/issues
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  crypto: ^3.0.3
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^3.0.0
