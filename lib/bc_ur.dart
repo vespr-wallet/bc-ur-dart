@@ -2,7 +2,7 @@
 ///
 /// This library provides a complete implementation of the BC-UR specification
 /// for encoding binary data in URIs and QR codes.
-library bc_ur;
+library;
 
 // Export all public APIs
 export 'src/bc_ur.dart';
