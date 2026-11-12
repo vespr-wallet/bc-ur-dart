@@ -1,0 +1,35 @@
+name: Unit Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install asdf & tools
+        uses: asdf-vm/actions/install@v4
+
+      - name: Install dependencies
+        run: dart pub get
+
+      # Pure Dart package (no Flutter dependency): `dart analyze` needs
+      # --fatal-infos to fail on lints, and `flutter test` would need flutter_test.
+      - name: Analyze code
+        run: dart analyze --fatal-infos
+
+      - name: Run tests
+        run: dart test --test-randomize-ordering-seed random
