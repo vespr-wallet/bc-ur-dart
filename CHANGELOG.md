@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Dependencies: dev `lints` ^3.0.0 → ^6.1.0, now enabled through `analysis_options.yaml` (recommended set). Library directive is now unnamed (`library;`).
+
 ## 1.0.2
 
 - JavaScript (dart2js/DDC) support: the fountain encoder/decoder threw `Unsupported operation` on the web because
