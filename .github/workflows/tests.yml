@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: dart pub get
 
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+
       # Pure Dart package (no Flutter dependency): `dart analyze` needs
       # --fatal-infos to fail on lints, and `flutter test` would need flutter_test.
       - name: Analyze code

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Tooling: Flutter 3.50.1 (still Dart 3.14.0) in `.tool-versions`, used by CI.
+- CI: the PR workflow fails on unformatted Dart code (`dart format --set-exit-if-changed`); the code already passed, so nothing was reformatted
 
 ## 1.0.3
 
