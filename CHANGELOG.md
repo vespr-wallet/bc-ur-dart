@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Tooling: Flutter 3.50.1 (still Dart 3.14.0) in `.tool-versions`, used by CI.
+
 ## 1.0.3
 
 - Dependencies: dev `lints` ^3.0.0 → ^6.1.0, now enabled through `analysis_options.yaml` (recommended set). Library directive is now unnamed (`library;`).
